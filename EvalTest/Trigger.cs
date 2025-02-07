@@ -10,9 +10,9 @@ Idea
 
 Use AST (Abstract Syntax Tree) to represent trigger conditions and evaluate them based on the latest readings of devices and datapoints.
 
-            / - Trigger - Op - Trigger (leaf node)
-Trigger - Op 
-            \ - Trigger - Op - Trigger (leaf node)
+                     / - Simple Trigger (leaf node): value - Op - reading 
+Composite trigger - Op 
+                     \ - Simple Trigger (leaf node): value - Op - reading
 
 Leaf nodes can be evaluated directly, while non-leaf nodes require recursive evaluation of child nodes.
 
@@ -57,10 +57,15 @@ public interface IAutomationTrigger
     bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings);
 }
 
-public enum ComparisonOperator { GreaterThan, LessThan, EqualTo, NotEqualTo }
-
+/// <summary>
+/// Binary operator for combining multiple triggers.
+/// </summary>
 public enum LogicalBinaryOperator { And, Or }
 
+/// <summary>
+/// Comparison operator for evaluating trigger conditions.
+/// </summary>
+public enum ComparisonOperator { GreaterThan, LessThan, EqualTo, NotEqualTo }
 
 /// <summary>
 /// Dictionary with datapoint name/value of latest readings for a device.
