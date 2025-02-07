@@ -10,9 +10,15 @@ Idea
 
 Use AST (Abstract Syntax Tree) to represent trigger conditions and evaluate them based on the latest readings of devices and datapoints.
 
-                     / - Simple Trigger (leaf node): value - Op - reading 
+                     / - Simple Trigger (leaf node): condition value - Op - reading 
 Composite trigger - Op 
-                     \ - Simple Trigger (leaf node): value - Op - reading
+                     \ - Simple Trigger (leaf node): condition value - Op - reading
+
+
+                                               /- ...leaf node
+                     / - Composite trigger - Op
+Composite trigger - Op                         \- ... leaf
+                     \ - Composite trigger ...
 
 Leaf nodes can be evaluated directly, while non-leaf nodes require recursive evaluation of child nodes.
 
@@ -84,13 +90,24 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
         PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
+
     public abstract bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings);
 
+    /// <summary>
+    /// Helper to load automations.
+    /// </summary>
+    /// <param name="json"></param>
+    /// <returns></returns>
     public static IAutomationTrigger? LoadAutomationFromJson(string json)
     {
         return JsonSerializer.Deserialize<AutomationTriggerBase>(json, options);
     }
 
+    /// <summary>
+    /// Helper to get devices referenced by an automation.
+    /// </summary>
+    /// <param name="automationTrigger"></param>
+    /// <returns></returns>
     public static IEnumerable<Guid> GetReferencedDevices(IAutomationTrigger? automationTrigger)
     {
         HashSet<Guid> referencedDevices = [];
@@ -109,7 +126,6 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
 
         return referencedDevices;
     }
-
 }
 
 
@@ -118,12 +134,12 @@ public class CompositeTrigger : AutomationTriggerBase
     public LogicalBinaryOperator Operator { get; set; }
     public List<AutomationTriggerBase> Conditions { get; set; } = [];
 
-    public override bool Evaluate(IDictionary<Guid, LastReadings> telemetryByDevice)
+    public override bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings)
     {
         return Operator switch
         {
-            LogicalBinaryOperator.And => Conditions.TrueForAll(condition => condition.Evaluate(telemetryByDevice)),
-            LogicalBinaryOperator.Or => Conditions.Exists(condition => condition.Evaluate(telemetryByDevice)),
+            LogicalBinaryOperator.And => Conditions.TrueForAll(condition => condition.Evaluate(allDevicesReadings)),
+            LogicalBinaryOperator.Or => Conditions.Exists(condition => condition.Evaluate(allDevicesReadings)),
             _ => throw new NotImplementedException(),
         };
     }
