@@ -1,0 +1,33 @@
+{
+  "Type": "Composite",
+  "Operator": "Or",
+  "Conditions": [
+    {
+      "Type": "Simple",
+      "DeviceId": "C30616B7-C70A-427F-84BB-6EC19FB4B67E",
+      "DatapointName": "temperature",
+      "Operator": "GreaterThan",
+      "ConditionValue": 100
+    },
+    {
+      "Type": "Composite",
+      "Operator": "And",
+      "Conditions": [
+        {
+          "Type": "Simple",
+          "DeviceId": "44C22283-0F08-4B00-948B-1A089E75C114",
+          "DatapointName": "temperature",
+          "Operator": "LessThan",
+          "ConditionValue": 30
+        },
+        {
+          "Type": "Simple",
+          "DeviceId": "B6B12AEB-DF55-404D-9ECF-F0BB6D582622",
+          "DatapointName": "pressure",
+          "Operator": "GreaterThan",
+          "ConditionValue": 150
+        }
+      ]
+    }
+  ]
+}
