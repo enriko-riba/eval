@@ -1,10 +1,10 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-using DeviceId = System.Guid;
-using DatapointName = string;
-
 namespace EvalTest;
+
+using DatapointName = string;
+using DeviceId = Guid;
 
 /*
   
@@ -77,7 +77,7 @@ public enum LogicalBinaryOperator { And, Or }
 public enum ComparisonOperator { GreaterThan, LessThan, EqualTo, NotEqualTo }
 
 /// <summary>
-/// Dictionary with datapoint name/value of latest readings for a device.
+/// Dictionary with datapoint name/value of latest readings for a single device.
 /// </summary>
 public class LastReadings : Dictionary<DatapointName, object> { }
 
