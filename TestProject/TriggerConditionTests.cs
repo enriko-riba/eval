@@ -39,7 +39,7 @@ public class TriggerConditionTests
         var condition = new CompositeTrigger
         {
             Operator = LogicalBinaryOperator.And,
-            Conditions =
+            Triggers =
             [
                 new SimpleTrigger
                 {
@@ -79,7 +79,7 @@ public class TriggerConditionTests
         var condition = new CompositeTrigger
         {
             Operator = LogicalBinaryOperator.And,
-            Conditions =
+            Triggers =
             [
                 new SimpleTrigger
                 {
@@ -119,7 +119,7 @@ public class TriggerConditionTests
         var condition = new CompositeTrigger
         {
             Operator = LogicalBinaryOperator.Or,
-            Conditions =
+            Triggers =
             [
                 new SimpleTrigger
                 {
@@ -159,7 +159,7 @@ public class TriggerConditionTests
         var condition = new CompositeTrigger
         {
             Operator = LogicalBinaryOperator.Or,
-            Conditions =
+            Triggers =
             [
                 new SimpleTrigger
                 {
@@ -171,7 +171,7 @@ public class TriggerConditionTests
                 new CompositeTrigger
                 {
                     Operator = LogicalBinaryOperator.And,
-                    Conditions =
+                    Triggers =
                     [
                         new SimpleTrigger
                         {
@@ -214,7 +214,7 @@ public class TriggerConditionTests
         var condition = new CompositeTrigger
         {
             Operator = LogicalBinaryOperator.Or,
-            Conditions =
+            Triggers =
             [
                 new SimpleTrigger
                 {
@@ -226,7 +226,7 @@ public class TriggerConditionTests
                 new CompositeTrigger
                 {
                     Operator = LogicalBinaryOperator.And,
-                    Conditions =
+                    Triggers =
                     [
                         new SimpleTrigger
                         {
@@ -238,7 +238,7 @@ public class TriggerConditionTests
                         new CompositeTrigger
                         {
                             Operator = LogicalBinaryOperator.Or,
-                            Conditions =
+                            Triggers =
                             [
                                 new SimpleTrigger
                                 {
@@ -257,7 +257,7 @@ public class TriggerConditionTests
                                 new CompositeTrigger
                                 {
                                     Operator = LogicalBinaryOperator.And,
-                                    Conditions =
+                                    Triggers =
                                     [
                                         new SimpleTrigger
                                         {
@@ -303,7 +303,7 @@ public class TriggerConditionTests
         var json = @"{
             ""Type"": ""Composite"",
             ""Operator"": ""Or"",
-            ""Conditions"": [
+            ""Triggers"": [
                 {
                     ""Type"": ""Simple"",
                     ""DeviceId"": ""C30616B7-C70A-427F-84BB-6EC19FB4B67E"",
@@ -314,7 +314,7 @@ public class TriggerConditionTests
                 {
                     ""Type"": ""Composite"",
                     ""Operator"": ""And"",
-                    ""Conditions"": [
+                    ""Triggers"": [
                         {
                             ""Type"": ""Simple"",
                             ""DeviceId"": ""44C22283-0F08-4B00-948B-1A089E75C114"",
@@ -342,6 +342,6 @@ public class TriggerConditionTests
         Assert.IsType<CompositeTrigger>(automation);
         var composite = (CompositeTrigger)automation;
         Assert.Equal(LogicalBinaryOperator.Or, composite.Operator);
-        Assert.Equal(2, composite.Conditions.Count);
+        Assert.Equal(2, composite.Triggers.Count);
     }
 }

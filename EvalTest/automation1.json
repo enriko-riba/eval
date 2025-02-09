@@ -1,7 +1,7 @@
 {
   "Type": "Composite",
   "Operator": "Or",
-  "Conditions": [
+  "Triggers": [
     {
       "Type": "Simple",
       "DeviceId": "C30616B7-C70A-427F-84BB-6EC19FB4B67E",
@@ -12,7 +12,7 @@
     {
       "Type": "Composite",
       "Operator": "And",
-      "Conditions": [
+      "Triggers": [
         {
           "Type": "Simple",
           "DeviceId": "44C22283-0F08-4B00-948B-1A089E75C114",

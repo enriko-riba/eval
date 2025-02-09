@@ -1,6 +1,9 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
+using DeviceId = System.Guid;
+using DatapointName = string;
+
 namespace EvalTest;
 
 /*
@@ -60,7 +63,7 @@ Formal Proof
 
 public interface IAutomationTrigger
 {
-    bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings);
+    bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
 }
 
 /// <summary>
@@ -76,7 +79,7 @@ public enum ComparisonOperator { GreaterThan, LessThan, EqualTo, NotEqualTo }
 /// <summary>
 /// Dictionary with datapoint name/value of latest readings for a device.
 /// </summary>
-public class LastReadings : Dictionary<string, object> { }
+public class LastReadings : Dictionary<DatapointName, object> { }
 
 
 /// <summary>
@@ -91,7 +94,7 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
-    public abstract bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings);
+    public abstract bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
 
     /// <summary>
     /// Helper to load automations.
@@ -108,9 +111,9 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
     /// </summary>
     /// <param name="automationTrigger"></param>
     /// <returns></returns>
-    public static IEnumerable<Guid> GetReferencedDevices(IAutomationTrigger? automationTrigger)
+    public static IEnumerable<DeviceId> GetReferencedDevices(IAutomationTrigger? automationTrigger)
     {
-        HashSet<Guid> referencedDevices = [];
+        HashSet<DeviceId> referencedDevices = [];
 
         if (automationTrigger is SimpleTrigger simpleTrigger)
         {
@@ -118,9 +121,9 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
         }
         else if (automationTrigger is CompositeTrigger compositeTrigger)
         {
-            foreach (var condition in compositeTrigger.Conditions)
+            foreach (var trigger in compositeTrigger.Triggers)
             {
-                referencedDevices.UnionWith(GetReferencedDevices(condition));
+                referencedDevices.UnionWith(GetReferencedDevices(trigger));
             }
         }
 
@@ -132,14 +135,14 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
 public class CompositeTrigger : AutomationTriggerBase
 {
     public LogicalBinaryOperator Operator { get; set; }
-    public List<AutomationTriggerBase> Conditions { get; set; } = [];
+    public List<AutomationTriggerBase> Triggers { get; set; } = [];
 
-    public override bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings)
+    public override bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)
     {
         return Operator switch
         {
-            LogicalBinaryOperator.And => Conditions.TrueForAll(condition => condition.Evaluate(allDevicesReadings)),
-            LogicalBinaryOperator.Or => Conditions.Exists(condition => condition.Evaluate(allDevicesReadings)),
+            LogicalBinaryOperator.And => Triggers.TrueForAll(trigger => trigger.Evaluate(allDevicesReadings)),
+            LogicalBinaryOperator.Or => Triggers.Exists(trigger => trigger.Evaluate(allDevicesReadings)),
             _ => throw new NotImplementedException(),
         };
     }
@@ -148,12 +151,12 @@ public class CompositeTrigger : AutomationTriggerBase
 
 public class SimpleTrigger : AutomationTriggerBase
 {
-    public Guid DeviceId { get; set; }
-    public string DatapointName { get; set; } = default!;
+    public DeviceId DeviceId { get; set; }
+    public DatapointName DatapointName { get; set; } = default!;
     public ComparisonOperator Operator { get; set; }
     public double ConditionValue { get; set; }  // TODO: type based on metadata?
 
-    public override bool Evaluate(IDictionary<Guid, LastReadings> allDevicesReadings)   //  TODO: LastReadings should contain metadata e.g. data type
+    public override bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)   //  TODO: LastReadings should contain metadata e.g. data type
     {
         if (!allDevicesReadings.TryGetValue(DeviceId, out var lastReadings))
             return false;
