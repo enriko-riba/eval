@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace EvalTest;
@@ -18,12 +19,16 @@ Composite trigger - Op
                      \ - Simple Trigger (leaf node): condition value - Op - reading
 
 
+
+
                                                /- ...leaf node
                      / - Composite trigger - Op
 Composite trigger - Op                         \- ... leaf
                      \ - Composite trigger ...
 
 Leaf nodes can be evaluated directly, while non-leaf nodes require recursive evaluation of child nodes.
+
+
 
 
 
@@ -61,9 +66,28 @@ Formal Proof
         Evaluate each sub-condition recursively and combine results according to the logical operator (AND: all must be true, OR: at least one must be true).
  */
 
+public enum EvaluationError
+{   
+    NoError,
+    
+    //  TODO: extend with more errors if needed
+
+    IncompleteData
+}
+
 public interface IAutomationTrigger
 {
-    bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
+    /// <summary>
+    /// Evaluates the trigger conditions based on the latest readings of devices and datapoints.
+    /// </summary>
+    /// <param name="allDevicesReadings"></param>
+    /// <returns></returns>
+    (bool IsAlert, EvaluationError error) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
+
+    /// <summary>
+    /// Returns true if last evaluation resulted in an alert condition.
+    /// </summary>
+    bool CurrentSignal { get; }
 }
 
 /// <summary>
@@ -86,6 +110,7 @@ public class LastReadings : Dictionary<DatapointName, object> { }
 /// Abstract base class, needed to handle polymorphic JSON serialization.
 /// </summary>
 [JsonConverter(typeof(AutomationTriggerBaseConverter))]
+[DebuggerDisplay("{GetType().Name}")]
 public abstract class AutomationTriggerBase : IAutomationTrigger
 {
     private static readonly JsonSerializerOptions options = new()
@@ -94,7 +119,11 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
-    public abstract bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
+    public abstract (bool IsAlert, EvaluationError error) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
+
+    public bool CurrentSignal { get; protected set; }
+
+    public EvaluationError CurrentError { get; protected set; }
 
     /// <summary>
     /// Helper to load automations.
@@ -129,6 +158,31 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
 
         return referencedDevices;
     }
+
+    /// <summary>
+    /// Returns a list of triggers that are in a signaled state (in alert condition).
+    /// </summary>
+    /// <param name="automationTrigger"></param>
+    /// <returns></returns>
+    public static IEnumerable<IAutomationTrigger> GetSignaledTriggers(IAutomationTrigger automationTrigger)
+    {      
+        List<IAutomationTrigger> signaledTriggers = [];
+
+        if (automationTrigger.CurrentSignal)
+        {
+            signaledTriggers.Add(automationTrigger);
+        }
+
+        if (automationTrigger is CompositeTrigger compositeTrigger)
+        {
+            foreach (var trigger in compositeTrigger.Triggers)
+            {
+                signaledTriggers.AddRange(GetSignaledTriggers(trigger));
+            }
+        }
+
+        return signaledTriggers;
+    }
 }
 
 
@@ -137,14 +191,33 @@ public class CompositeTrigger : AutomationTriggerBase
     public LogicalBinaryOperator Operator { get; set; }
     public List<AutomationTriggerBase> Triggers { get; set; } = [];
 
-    public override bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)
+    public override (bool, EvaluationError) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)
     {
-        return Operator switch
-        {
-            LogicalBinaryOperator.And => Triggers.TrueForAll(trigger => trigger.Evaluate(allDevicesReadings)),
-            LogicalBinaryOperator.Or => Triggers.Exists(trigger => trigger.Evaluate(allDevicesReadings)),
-            _ => throw new NotImplementedException(),
-        };
+        var identitySeed = Operator == LogicalBinaryOperator.And;   // must start with true for ANDs and false for ORs
+        var result = Triggers.Aggregate(
+            (IsAlert: identitySeed, error: EvaluationError.NoError),
+            (acc, trigger) =>
+            {
+                var (isAlert, triggerError) = trigger.Evaluate(allDevicesReadings);
+                return (
+                    IsAlert: Operator == LogicalBinaryOperator.And ? acc.IsAlert && isAlert : acc.IsAlert || isAlert,
+                    error: triggerError != EvaluationError.NoError ? triggerError : acc.error
+                );
+            });
+        CurrentSignal = result.IsAlert;
+        CurrentError = result.error;
+        return result;
+
+        //
+        //  The above is the same as the following two lines except it captures the EvaluationError:
+        //
+        //var result = Operator switch
+        //{
+        //    LogicalBinaryOperator.And => Triggers.All(trigger => trigger.Evaluate(allDevicesReadings).IsAlert),
+        //    LogicalBinaryOperator.Or => Triggers.Any(trigger => trigger.Evaluate(allDevicesReadings).IsAlert),
+        //    _ => throw new NotImplementedException(),
+        //};
+        //return (result, ErrorReason.NoError);
     }
 }
 
@@ -156,24 +229,40 @@ public class SimpleTrigger : AutomationTriggerBase
     public ComparisonOperator Operator { get; set; }
     public double ConditionValue { get; set; }  // TODO: type based on metadata?
 
-    public override bool Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)   //  TODO: LastReadings should contain metadata e.g. data type
+    public override (bool, EvaluationError) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)   //  TODO: LastReadings should contain metadata e.g. data type
     {
         if (!allDevicesReadings.TryGetValue(DeviceId, out var lastReadings))
-            return false;
+        {
+            CurrentError = EvaluationError.IncompleteData;
+            CurrentSignal = false;
+            return (CurrentSignal, CurrentError);
+        }
 
         if (!lastReadings.TryGetValue(DatapointName, out var dataPointValue))
-            return false;
+        {
+            CurrentError = EvaluationError.IncompleteData;
+            CurrentSignal = false;
+            return (CurrentSignal, CurrentError);
+        }
 
         //  TODO: based on metadata, convert the datapoint value to strongly typed representation
         var value = Convert.ToDouble(dataPointValue);
 
-        return Operator switch
+        var result = Operator switch
         {
             ComparisonOperator.GreaterThan => value > ConditionValue,
             ComparisonOperator.LessThan => value < ConditionValue,
-            ComparisonOperator.EqualTo => value == ConditionValue,
+            ComparisonOperator.EqualTo => value == ConditionValue ,
             ComparisonOperator.NotEqualTo => value != ConditionValue,
             _ => throw new NotImplementedException(),
         };
+        CurrentSignal = result;
+        CurrentError = EvaluationError.NoError;
+        return (CurrentSignal, CurrentError);
+    }
+
+    override public string ToString()
+    {
+        return $"device '{DeviceId}', datapoint '{DatapointName}' {Operator} {ConditionValue}";
     }
 }

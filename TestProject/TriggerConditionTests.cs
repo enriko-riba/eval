@@ -25,7 +25,7 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.True(result);
@@ -65,7 +65,7 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.True(result);
@@ -105,7 +105,7 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.False(result);
@@ -145,7 +145,7 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.True(result);
@@ -200,14 +200,20 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    // Device1.temperature > 100 OR (Device2.temperature < 30 AND (Device3.pressure > 150 OR Device1.humidity < 50 OR (Device2.pressure > 200 AND Device3.temperature < 20))) (true)
+    // Device1.temperature > 100 OR
+    // (Device2.temperature < 30 AND
+    //     (Device3.pressure > 150 OR Device1.humidity < 50 OR
+    //         (Device2.pressure > 200 AND Device3.temperature < 20)
+    //     )
+    // )
+    // (true)
     public void DeepNestedCondition_ComplexLogic_ReturnsExpectedResult()
     {
         // Arrange
@@ -290,7 +296,7 @@ public class TriggerConditionTests
         };
 
         // Act
-        var result = condition.Evaluate(readings);
+        var (result, _) = condition.Evaluate(readings);
 
         // Assert
         Assert.True(result);
