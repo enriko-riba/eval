@@ -194,19 +194,18 @@ public class CompositeTrigger : AutomationTriggerBase
     public override (bool, EvaluationError) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)
     {
         var identitySeed = Operator == LogicalBinaryOperator.And;   // must start with true for ANDs and false for ORs
-        var result = Triggers.Aggregate(
+        var (IsAlert, error) = Triggers.Aggregate(
             (IsAlert: identitySeed, error: EvaluationError.NoError),
-            (acc, trigger) =>
-            {
+            (acc, trigger) => {
                 var (isAlert, triggerError) = trigger.Evaluate(allDevicesReadings);
                 return (
-                    IsAlert: Operator == LogicalBinaryOperator.And ? acc.IsAlert && isAlert : acc.IsAlert || isAlert,
-                    error: triggerError != EvaluationError.NoError ? triggerError : acc.error
+                    Operator == LogicalBinaryOperator.And ? acc.IsAlert && isAlert : acc.IsAlert || isAlert,
+                    triggerError != EvaluationError.NoError ? triggerError : acc.error
                 );
             });
-        CurrentSignal = result.IsAlert;
-        CurrentError = result.error;
-        return result;
+        CurrentSignal = IsAlert;
+        CurrentError = error;
+        return (CurrentSignal, CurrentError);
 
         //
         //  The above is the same as the following two lines except it captures the EvaluationError:
