@@ -78,25 +78,27 @@ public enum EvaluationError
 public interface IAutomationTrigger
 {
     /// <summary>
-    /// Evaluates the trigger conditions based on the latest readings of devices and datapoints.
+    /// Evaluates the trigger, depending on trigger type it recursively evaluates child triggers until a leaf node is reached where the evaluation is done against the triggers datapoint and defined condition.
     /// </summary>
-    /// <param name="allDevicesReadings"></param>
-    /// <returns></returns>
+    /// <param name="allDevicesReadings">dictionary containing all devices with all datapoints referenced in the automation.</param>
+    /// <returns>the alert signal and evaluation error</returns>
     (bool IsAlert, EvaluationError error) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings);
 
     /// <summary>
-    /// Returns true if last evaluation resulted in an alert condition.
+    /// Returns true if last evaluation was successful and the result signals an alert condition.
     /// </summary>
     bool CurrentSignal { get; }
 }
 
 /// <summary>
-/// Binary operator for combining multiple triggers.
+/// Binary operator for combining multiple triggers. 
+/// Can be extended with more operators, but they must be binary (combining two operands).
 /// </summary>
 public enum LogicalBinaryOperator { And, Or }
 
 /// <summary>
 /// Comparison operator for evaluating trigger conditions.
+/// Introduced to allow future extensions with new operators.
 /// </summary>
 public enum ComparisonOperator { GreaterThan, LessThan, EqualTo, NotEqualTo }
 
@@ -186,6 +188,10 @@ public abstract class AutomationTriggerBase : IAutomationTrigger
 }
 
 
+/// <summary>
+/// Trigger that combines multiple triggers using a logical binary operator.
+/// Note: no readings are processed until the recursive evaluation of child triggers reaches a leaf node.
+/// </summary>
 public class CompositeTrigger : AutomationTriggerBase
 {
     public LogicalBinaryOperator Operator { get; set; }
@@ -220,7 +226,9 @@ public class CompositeTrigger : AutomationTriggerBase
     }
 }
 
-
+/// <summary>
+/// Trigger type that is actually evaluated against the latest readings of a single datapoint.
+/// </summary>
 public class SimpleTrigger : AutomationTriggerBase
 {
     public DeviceId DeviceId { get; set; }
@@ -230,20 +238,24 @@ public class SimpleTrigger : AutomationTriggerBase
 
     public override (bool, EvaluationError) Evaluate(IDictionary<DeviceId, LastReadings> allDevicesReadings)   //  TODO: LastReadings should contain metadata e.g. data type
     {
+        CurrentError = EvaluationError.NoError;
+
         if (!allDevicesReadings.TryGetValue(DeviceId, out var lastReadings))
         {
             CurrentError = EvaluationError.IncompleteData;
             CurrentSignal = false;
-            return (CurrentSignal, CurrentError);
         }
 
-        if (!lastReadings.TryGetValue(DatapointName, out var dataPointValue))
+        if (!lastReadings!.TryGetValue(DatapointName, out var dataPointValue))
         {
             CurrentError = EvaluationError.IncompleteData;
             CurrentSignal = false;
-            return (CurrentSignal, CurrentError);
         }
 
+        if(CurrentError != EvaluationError.NoError)
+            return (CurrentSignal, CurrentError);
+
+        
         //  TODO: based on metadata, convert the datapoint value to strongly typed representation
         var value = Convert.ToDouble(dataPointValue);
 
@@ -256,7 +268,6 @@ public class SimpleTrigger : AutomationTriggerBase
             _ => throw new NotImplementedException(),
         };
         CurrentSignal = result;
-        CurrentError = EvaluationError.NoError;
         return (CurrentSignal, CurrentError);
     }
 
